@@ -1,0 +1,60 @@
+<%+header%>
+<h2><a id="content" name="content"><%:流量监控%></a></h2>
+
+<div class="cbi-map">
+    <div class="cbi-section">
+        <div class="table-wrapper">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th><%:源IP%></th>
+                        <th><%:目标域名%></th>
+                        <th><%:上行流量%></th>
+                        <th><%:下行流量%></th>
+                        <th><%:总流量%></th>
+                        <th><%:最后活跃时间%></th>
+                    </tr>
+                </thead>
+                <tbody id="traffic-table">
+                    <tr><td colspan="6"><%:正在加载数据...%></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+XHR.poll(5, '<%=url("admin/network/iftop/data")%>', null,
+    function(x, data) {
+        var table = document.getElementById('traffic-table');
+        table.innerHTML = '';
+        
+        data.forEach(function(row) {
+            var tr = document.createElement('tr');
+            
+            var formatBytes = function(bytes) {
+                if (bytes >= 1073741824) return (bytes / 1073741824).toFixed(2) + ' GB';
+                if (bytes >= 1048576) return (bytes / 1048576).toFixed(2) + ' MB';
+                if (bytes >= 1024) return (bytes / 1024).toFixed(2) + ' KB';
+                return bytes + ' B';
+            };
+            
+            var date = new Date(row.timestamp * 1000);
+            var timeStr = date.toLocaleString();
+            
+            tr.innerHTML = [
+                '<td>' + (row.src_ip || '-') + '</td>',
+                '<td>' + (row.dst_host || '-') + '</td>',
+                '<td>' + formatBytes(row.rx_bytes) + '</td>',
+                '<td>' + formatBytes(row.tx_bytes) + '</td>',
+                '<td>' + formatBytes(row.total_bytes) + '</td>',
+                '<td>' + timeStr + '</td>'
+            ].join('');
+            
+            table.appendChild(tr);
+        });
+    }
+);
+</script>
+
+<%+footer%>

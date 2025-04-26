@@ -1,0 +1,110 @@
+<%+header%>
+<h2><a id="content" name="content"><%:流量图表%></a></h2>
+
+<div class="cbi-map">
+    <div class="cbi-section">
+        <div class="controls">
+            <label><%:时间粒度:%></label>
+            <select id="granularity" class="cbi-input-select">
+                <option value="5min">5分钟</option>
+                <option value="hour" selected>小时</option>
+                <option value="day">天</option>
+            </select>
+            <button class="cbi-button cbi-button-apply" onclick="loadData()"><%:刷新%></button>
+            <button class="cbi-button cbi-button-download" onclick="exportData()"><%:导出数据%></button>
+        </div>
+        
+        <div id="chart-container" style="width:100%;height:500px;"></div>
+    </div>
+</div>
+
+<script src="<%=resource%>/cbi/echarts/echarts.min.js"></script>
+<script>
+var chart = echarts.init(document.getElementById('chart-container'));
+var option = {
+    tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+            var date = new Date(params[0].value[0]);
+            var res = date.toLocaleString() + '<br/>';
+            params.forEach(function(item) {
+                res += item.marker + ' ' + item.seriesName + ': ' + 
+                      (item.value[1] >= 1073741824 ? (item.value[1]/1073741824).toFixed(2)+' GB' :
+                      item.value[1] >= 1048576 ? (item.value[1]/1048576).toFixed(2)+' MB' :
+                      (item.value[1]/1024).toFixed(2)+' KB');
+            });
+            return res;
+        }
+    },
+    legend: {
+        data: ['上行流量', '下行流量', '总流量']
+    },
+    xAxis: {
+        type: 'time'
+    },
+    yAxis: {
+        type: 'value',
+        axisLabel: {
+            formatter: function(value) {
+                return value >= 1073741824 ? (value/1073741824).toFixed(1)+'GB' :
+                       value >= 1048576 ? (value/1048576).toFixed(1)+'MB' :
+                       (value/1024).toFixed(1)+'KB';
+            }
+        }
+    },
+    dataZoom: [{
+        type: 'inside',
+        start: 0,
+        end: 100
+    }, {
+        start: 0,
+        end: 100
+    }],
+    series: [
+        { name: '上行流量', type: 'line', showSymbol: false },
+        { name: '下行流量', type: 'line', showSymbol: false },
+        { name: '总流量', type: 'line', showSymbol: false }
+    ]
+};
+
+function loadData() {
+    var granularity = document.getElementById('granularity').value;
+    XHR.get('<%=url("admin/network/iftop/data")%>', {
+        granularity: granularity
+    }, function(x, data) {
+        var seriesData = {
+            '上行流量': [],
+            '下行流量': [],
+            '总流量': []
+        };
+        
+        data.forEach(function(row) {
+            var timestamp = row.time_interval || row.timestamp;
+            seriesData['上行流量'].push([timestamp * 1000, row.rx_bytes]);
+            seriesData['下行流量'].push([timestamp * 1000, row.tx_bytes]);
+            seriesData['总流量'].push([timestamp * 1000, row.total_bytes]);
+        });
+        
+        option.series.forEach(function(series) {
+            series.data = seriesData[series.name];
+        });
+        
+        chart.setOption(option);
+    });
+}
+
+function exportData() {
+    var granularity = document.getElementById('granularity').value;
+    window.open('<%=url("admin/network/iftop/export")%>?granularity=' + granularity);
+}
+
+// Initial load
+loadData();
+
+// Handle window resize
+window.addEventListener('resize', function() {
+    chart.resize();
+});
+</script>
+
+<%+footer%>

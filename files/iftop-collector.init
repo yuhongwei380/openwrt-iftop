@@ -1,0 +1,41 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+USE_PROCD=1
+PROG=/usr/share/iftop-collector/collector.py
+
+start_service() {
+    # Ensure database exists
+    [ -f /usr/share/iftop-data/traffic.db ] || {
+        sqlite3 /usr/share/iftop-data/traffic.db \
+            "CREATE TABLE traffic \
+             (timestamp INTEGER, src_ip TEXT, dst_host TEXT, \
+              rx_bytes INTEGER, tx_bytes INTEGER, total_bytes INTEGER);"
+    }
+
+    # Start crond if not running
+    [ -f /var/run/crond.pid ] || /etc/init.d/cron start
+
+    # Add our cron job if not exists
+    grep -q "iftop-collector" /etc/crontabs/root || {
+        echo '*/5 * * * * python3 /usr/share/iftop-collector/collector.py' >> /etc/crontabs/root
+        /etc/init.d/cron restart
+    }
+
+    procd_open_instance
+    procd_set_param command "$PROG"
+    procd_set_param respawn
+    procd_close_instance
+}
+
+stop_service() {
+    # Keep database and cron job
+    true
+}
+
+restart() {
+    stop
+    start
+}
